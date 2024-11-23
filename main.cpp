@@ -15,10 +15,16 @@ SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Surface *winSurface;
 SDL_GameController *controller;
+SDL_Texture* boxTexture;
 
 b2WorldId worldId;
 b2BodyId groundId;
 std::vector<b2BodyId> bodies;
+
+static float timeStep = 1.0f / 60.0f;
+static int subStepCount = 4;
+static float gravityX = 0.0f;
+static float gravityY = -1.0f;
 
 // Startup ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,15 +82,29 @@ int initDisplay()
     return 1;
 }
 
+int initTextures() {
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, 0, physToPixel, physToPixel, SDL_PIXELFORMAT_RGBA8888);
+    boxTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, physToPixel, physToPixel);
+    SDL_SetRenderTarget(renderer, boxTexture);
+    SDL_Rect rect = {0, 0, physToPixel, physToPixel};
+    SDL_SetRenderDrawColor(renderer, 0, 128, 0, 255);
+    SDL_RenderFillRect(renderer, &rect);
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    SDL_RenderDrawRect(renderer, &rect);
+    SDL_SetRenderTarget(renderer, NULL );
+    SDL_FreeSurface(surface);
+    return 1;
+}
+
 int initPhysics() {
     b2WorldDef worldDef = b2DefaultWorldDef();
-    worldDef.gravity = (b2Vec2){0.0f, -1.0f};
+    worldDef.gravity = (b2Vec2){gravityX, gravityY};
     worldId = b2CreateWorld(&worldDef);
 
     b2BodyDef groundBodyDef = b2DefaultBodyDef();
     groundBodyDef.position = (b2Vec2){0.0f, -5.0f};
     groundId = b2CreateBody(worldId, &groundBodyDef);
-    b2Polygon groundBox = b2MakeBox(50.0f, 10.0f);
+    b2Polygon groundBox = b2MakeBox(40.0f, 10.0f);
     b2ShapeDef groundShapeDef = b2DefaultShapeDef();
     b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
 
@@ -104,6 +124,8 @@ int init()
         if(!initPhysics())
             return 0;
         if (!initDisplay())
+            return 0;
+        if (!initTextures())
             return 0;
     }
     return 1;
@@ -198,19 +220,27 @@ SDL_Vertex triangleVertex[3] =
 
 void paint()
 {
-    SDL_SetRenderDrawColor(renderer, 5, 5, 5, 255);
+    SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
     SDL_RenderClear(renderer);
     SDL_RenderGeometry(renderer, nullptr, triangleVertex, 3, nullptr, 0);
+
+    SDL_Rect srcRect = {0, 0, physToPixel, physToPixel};
+    SDL_Rect destRect = {100, 100, physToPixel, physToPixel};
     
     for (int i = 0; i < bodies.size(); i++) {
-        SDL_SetRenderDrawColor(renderer, 250, 250, 250, 128);
+        SDL_SetRenderDrawColor(renderer, 250, 0, 0, 128);
         b2Vec2 position = b2Body_GetPosition(bodies[i]);
-        // b2Rot rotation = b2Body_GetRotation(bodyId);
-        // float angle = b2Rot_GetAngle(rotation);
-        SDL_Rect box = {winWidth / 2 + (int)(position.x * physToPixel / 2), (int)(winHeight - position.y * physToPixel / 2), physToPixel, physToPixel};
-        SDL_RenderDrawRect(renderer, &box);
+        
+        b2Rot rotation = b2Body_GetRotation(bodies[i]);
+        float angle = b2Rot_GetAngle(rotation) * 57.295;
+        
+        SDL_Rect box = {winWidth / 2 + (int)(position.x * physToPixel / 2), 
+                        (int)(winHeight - position.y * physToPixel / 2), 
+                        physToPixel,
+                        physToPixel};
+        SDL_RenderCopyEx(renderer, boxTexture, &srcRect, &box, angle, nullptr, SDL_FLIP_NONE);
     }
-
+    
     SDL_RenderPresent(renderer);
 }
 
@@ -240,9 +270,6 @@ void checkEvents()
 int main(int argc, char const *argv[])
 {
     running = init();
-
-    float timeStep = 1.0f / 60.0f;
-    int subStepCount = 4;
 
     while (running)
     {
