@@ -1,12 +1,13 @@
 #include <iostream>
 #include <SDL2/SDL.h>
+#include <vector>
 #include "box2d/box2d.h"
 
 static int winWidth = 800;
 static int winHeight = 600;
 static int running = 1;
 
-static const int physToPixel = 150;
+static const int physToPixel = 20;
 static const char *title = "Reaction Force";
 static const int speed = 5;
 
@@ -17,7 +18,7 @@ SDL_GameController *controller;
 
 b2WorldId worldId;
 b2BodyId groundId;
-b2BodyId bodyId;
+std::vector<b2BodyId> bodies;
 
 // Startup ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -77,25 +78,16 @@ int initDisplay()
 
 int initPhysics() {
     b2WorldDef worldDef = b2DefaultWorldDef();
-    worldDef.gravity = (b2Vec2){0.0f, -10.0f};
+    worldDef.gravity = (b2Vec2){0.0f, -1.0f};
     worldId = b2CreateWorld(&worldDef);
 
     b2BodyDef groundBodyDef = b2DefaultBodyDef();
-    groundBodyDef.position = (b2Vec2){0.0f, -10.0f};
+    groundBodyDef.position = (b2Vec2){0.0f, -5.0f};
     groundId = b2CreateBody(worldId, &groundBodyDef);
     b2Polygon groundBox = b2MakeBox(50.0f, 10.0f);
     b2ShapeDef groundShapeDef = b2DefaultShapeDef();
     b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
 
-    b2BodyDef bodyDef = b2DefaultBodyDef();
-    bodyDef.type = b2_dynamicBody;
-    bodyDef.position = (b2Vec2){0.0f, 4.0f};
-    bodyId = b2CreateBody(worldId, &bodyDef);
-    b2Polygon dynamicBox = b2MakeBox(1.0f, 1.0f);
-    b2ShapeDef shapeDef = b2DefaultShapeDef();
-    shapeDef.density = 1.0f;
-    shapeDef.friction = 0.3f;
-    b2CreatePolygonShape(bodyId, &shapeDef, &dynamicBox);
     return 1;
 }
 
@@ -117,6 +109,23 @@ int init()
     return 1;
 }
 
+// Physics logic //////////////////////////////////////////////////////////////////////////////////
+
+void addBody() {
+    b2BodyDef bodyDef = b2DefaultBodyDef();
+    bodyDef.type = b2_dynamicBody;
+    bodyDef.position = (b2Vec2){0.0f, 80.0f};
+    b2BodyId bodyId = b2CreateBody(worldId, &bodyDef);
+
+    b2Polygon dynamicBox = b2MakeBox(1.0f, 1.0f);
+    b2ShapeDef shapeDef = b2DefaultShapeDef();
+    shapeDef.density = 1.0f;
+    shapeDef.friction = 0.3f;
+    b2CreatePolygonShape(bodyId, &shapeDef, &dynamicBox);
+    
+    bodies.push_back(bodyId);
+}
+
 // Event Handling /////////////////////////////////////////////////////////////////////////////////
 
 void handleButtonPress(SDL_Event event)
@@ -124,22 +133,23 @@ void handleButtonPress(SDL_Event event)
     SDL_GameControllerButton button = (SDL_GameControllerButton)event.cbutton.button;
     switch (button)
     {
-    case SDL_CONTROLLER_BUTTON_A:
-        break;
-    case SDL_CONTROLLER_BUTTON_B:
-        break;
-    case SDL_CONTROLLER_BUTTON_X:
-        break;
-    case SDL_CONTROLLER_BUTTON_Y:
-        break;
-    case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
-        break;
-    case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
-        break;
-    case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
-        break;
-    case SDL_CONTROLLER_BUTTON_DPAD_UP:
-        break;
+        case SDL_CONTROLLER_BUTTON_A:
+            addBody();
+            break;
+        case SDL_CONTROLLER_BUTTON_B:
+            break;
+        case SDL_CONTROLLER_BUTTON_X:
+            break;
+        case SDL_CONTROLLER_BUTTON_Y:
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_UP:
+            break;
     }
 }
 
@@ -147,22 +157,24 @@ void handleKeyInput(SDL_Event event)
 {
     switch (event.key.keysym.sym)
     {
-    case SDLK_UP:
-        break;
-    case SDLK_LEFT:
-        break;
-    case SDLK_RIGHT:
-        break;
-    case SDLK_DOWN:
-        break;
-    case SDLK_w:
-        break;
-    case SDLK_a:
-        break;
-    case SDLK_d:
-        break;
-    case SDLK_s:
-        break;
+        case SDLK_UP:
+            break;
+        case SDLK_LEFT:
+            break;
+        case SDLK_RIGHT:
+            break;
+        case SDLK_DOWN:
+            break;
+        case SDLK_w:
+            break;
+        case SDLK_a:
+            break;
+        case SDLK_d:
+            break;
+        case SDLK_s:
+            break;
+        case SDLK_SPACE:
+            addBody();
     }
 }
 
@@ -190,12 +202,14 @@ void paint()
     SDL_RenderClear(renderer);
     SDL_RenderGeometry(renderer, nullptr, triangleVertex, 3, nullptr, 0);
     
-    SDL_SetRenderDrawColor(renderer, 250, 250, 250, 128);
-    b2Vec2 position = b2Body_GetPosition(bodyId);
-    // b2Rot rotation = b2Body_GetRotation(bodyId);
-    // float angle = b2Rot_GetAngle(rotation);
-    SDL_Rect box = {winWidth / 2 + (int)(position.x * physToPixel), (int)(winHeight - position.y * 150), 20, 20};
-    SDL_RenderDrawRect(renderer, &box);
+    for (int i = 0; i < bodies.size(); i++) {
+        SDL_SetRenderDrawColor(renderer, 250, 250, 250, 128);
+        b2Vec2 position = b2Body_GetPosition(bodies[i]);
+        // b2Rot rotation = b2Body_GetRotation(bodyId);
+        // float angle = b2Rot_GetAngle(rotation);
+        SDL_Rect box = {winWidth / 2 + (int)(position.x * physToPixel / 2), (int)(winHeight - position.y * physToPixel / 2), physToPixel, physToPixel};
+        SDL_RenderDrawRect(renderer, &box);
+    }
 
     SDL_RenderPresent(renderer);
 }
