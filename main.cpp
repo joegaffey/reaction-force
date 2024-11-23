@@ -1,11 +1,12 @@
-#include <SDL2/SDL.h>
 #include <iostream>
+#include <SDL2/SDL.h>
 #include "box2d/box2d.h"
 
 static int winWidth = 800;
 static int winHeight = 600;
 static int running = 1;
 
+static const int physToPixel = 150;
 static const char *title = "Reaction Force";
 static const int speed = 5;
 
@@ -13,6 +14,10 @@ SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Surface *winSurface;
 SDL_GameController *controller;
+
+b2WorldId worldId;
+b2BodyId groundId;
+b2BodyId bodyId;
 
 // Startup ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -70,6 +75,30 @@ int initDisplay()
     return 1;
 }
 
+int initPhysics() {
+    b2WorldDef worldDef = b2DefaultWorldDef();
+    worldDef.gravity = (b2Vec2){0.0f, -10.0f};
+    worldId = b2CreateWorld(&worldDef);
+
+    b2BodyDef groundBodyDef = b2DefaultBodyDef();
+    groundBodyDef.position = (b2Vec2){0.0f, -10.0f};
+    groundId = b2CreateBody(worldId, &groundBodyDef);
+    b2Polygon groundBox = b2MakeBox(50.0f, 10.0f);
+    b2ShapeDef groundShapeDef = b2DefaultShapeDef();
+    b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
+
+    b2BodyDef bodyDef = b2DefaultBodyDef();
+    bodyDef.type = b2_dynamicBody;
+    bodyDef.position = (b2Vec2){0.0f, 4.0f};
+    bodyId = b2CreateBody(worldId, &bodyDef);
+    b2Polygon dynamicBox = b2MakeBox(1.0f, 1.0f);
+    b2ShapeDef shapeDef = b2DefaultShapeDef();
+    shapeDef.density = 1.0f;
+    shapeDef.friction = 0.3f;
+    b2CreatePolygonShape(bodyId, &shapeDef, &dynamicBox);
+    return 1;
+}
+
 int init()
 {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK != 0))
@@ -80,6 +109,8 @@ int init()
     else
     {
         initControllers();
+        if(!initPhysics())
+            return 0;
         if (!initDisplay())
             return 0;
     }
@@ -158,6 +189,14 @@ void paint()
     SDL_SetRenderDrawColor(renderer, 5, 5, 5, 255);
     SDL_RenderClear(renderer);
     SDL_RenderGeometry(renderer, nullptr, triangleVertex, 3, nullptr, 0);
+    
+    SDL_SetRenderDrawColor(renderer, 250, 250, 250, 128);
+    b2Vec2 position = b2Body_GetPosition(bodyId);
+    // b2Rot rotation = b2Body_GetRotation(bodyId);
+    // float angle = b2Rot_GetAngle(rotation);
+    SDL_Rect box = {winWidth / 2 + (int)(position.x * physToPixel), (int)(winHeight - position.y * 150), 20, 20};
+    SDL_RenderDrawRect(renderer, &box);
+
     SDL_RenderPresent(renderer);
 }
 
@@ -188,37 +227,12 @@ int main(int argc, char const *argv[])
 {
     running = init();
 
-    b2WorldDef worldDef = b2DefaultWorldDef();
-    worldDef.gravity = (b2Vec2){0.0f, -10.0f};
-    b2WorldId worldId = b2CreateWorld(&worldDef);
-
-    b2BodyDef groundBodyDef = b2DefaultBodyDef();
-    groundBodyDef.position = (b2Vec2){0.0f, -10.0f};
-    b2BodyId groundId = b2CreateBody(worldId, &groundBodyDef);
-    b2Polygon groundBox = b2MakeBox(50.0f, 10.0f);
-    b2ShapeDef groundShapeDef = b2DefaultShapeDef();
-    b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
-
-    b2BodyDef bodyDef = b2DefaultBodyDef();
-    bodyDef.type = b2_dynamicBody;
-    bodyDef.position = (b2Vec2){0.0f, 4.0f};
-    b2BodyId bodyId = b2CreateBody(worldId, &bodyDef);
-    b2Polygon dynamicBox = b2MakeBox(1.0f, 1.0f);
-    b2ShapeDef shapeDef = b2DefaultShapeDef();
-    shapeDef.density = 1.0f;
-    shapeDef.friction = 0.3f;
-    b2CreatePolygonShape(bodyId, &shapeDef, &dynamicBox);
-
     float timeStep = 1.0f / 60.0f;
     int subStepCount = 4;
 
     while (running)
     {
         b2World_Step(worldId, timeStep, subStepCount);
-        b2Vec2 position = b2Body_GetPosition(bodyId);
-        b2Rot rotation = b2Body_GetRotation(bodyId);
-        printf("%4.2f %4.2f %4.2f\n", position.x, position.y, b2Rot_GetAngle(rotation));
-
         checkEvents();
         paint();
     }
