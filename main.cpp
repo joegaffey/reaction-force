@@ -19,6 +19,7 @@ SDL_Texture* boxTexture;
 
 b2WorldId worldId;
 b2BodyId groundId;
+b2BodyId shipId;
 std::vector<b2BodyId> bodies;
 
 static float timeStep = 1.0f / 60.0f;
@@ -108,6 +109,17 @@ int initPhysics() {
     b2ShapeDef groundShapeDef = b2DefaultShapeDef();
     b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
 
+    b2BodyDef bodyDef = b2DefaultBodyDef();
+    bodyDef.type = b2_dynamicBody;
+    bodyDef.position = (b2Vec2){0.0f, 80.0f};
+    shipId = b2CreateBody(worldId, &bodyDef);
+
+    b2Polygon dynamicBox = b2MakeBox(1.0f, 1.0f);
+    b2ShapeDef shapeDef = b2DefaultShapeDef();
+    shapeDef.density = 1.0f;
+    shapeDef.friction = 0.3f;
+    b2CreatePolygonShape(shipId, &shapeDef, &dynamicBox);
+
     return 1;
 }
 
@@ -146,6 +158,11 @@ void addBody() {
     b2CreatePolygonShape(bodyId, &shapeDef, &dynamicBox);
     
     bodies.push_back(bodyId);
+}
+
+void mainThrust() {
+    b2Vec2 position =  b2Body_GetPosition(shipId);
+    b2Body_ApplyForce(shipId, { 0.0f, 200.0f }, position, true);
 }
 
 // Event Handling /////////////////////////////////////////////////////////////////////////////////
@@ -196,7 +213,11 @@ void handleKeyInput(SDL_Event event)
         case SDLK_s:
             break;
         case SDLK_SPACE:
+            mainThrust();
+            break;
+        case SDLK_RETURN:
             addBody();
+            break;
     }
 }
 
@@ -218,27 +239,35 @@ SDL_Vertex triangleVertex[3] =
     {{50, 0}, {0, 0, 255, 255}}
 };
 
+void paintBox(b2BodyId bodyId) {
+    SDL_Rect srcRect = {0, 0, physToPixel, physToPixel};
+    SDL_Rect destRect = {100, 100, physToPixel, physToPixel};
+
+    b2Vec2 position = b2Body_GetPosition(bodyId);
+    b2Rot rotation = b2Body_GetRotation(bodyId);
+    float angle = b2Rot_GetAngle(rotation) * 57.295;
+    
+    SDL_Rect box = {winWidth / 2 + (int)(position.x * physToPixel / 2), 
+                    (int)(winHeight - position.y * physToPixel / 2), 
+                    physToPixel,
+                    physToPixel};
+    SDL_RenderCopyEx(renderer, boxTexture, &srcRect, &box, angle, nullptr, SDL_FLIP_NONE);
+}
+
+void paintShip() {
+    paintBox(shipId); // Temp graphics
+}
+
 void paint()
 {
     SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
     SDL_RenderClear(renderer);
     SDL_RenderGeometry(renderer, nullptr, triangleVertex, 3, nullptr, 0);
 
-    SDL_Rect srcRect = {0, 0, physToPixel, physToPixel};
-    SDL_Rect destRect = {100, 100, physToPixel, physToPixel};
-    
+    paintShip();
+
     for (int i = 0; i < bodies.size(); i++) {
-        SDL_SetRenderDrawColor(renderer, 250, 0, 0, 128);
-        b2Vec2 position = b2Body_GetPosition(bodies[i]);
-        
-        b2Rot rotation = b2Body_GetRotation(bodies[i]);
-        float angle = b2Rot_GetAngle(rotation) * 57.295;
-        
-        SDL_Rect box = {winWidth / 2 + (int)(position.x * physToPixel / 2), 
-                        (int)(winHeight - position.y * physToPixel / 2), 
-                        physToPixel,
-                        physToPixel};
-        SDL_RenderCopyEx(renderer, boxTexture, &srcRect, &box, angle, nullptr, SDL_FLIP_NONE);
+        paintBox(bodies[i]);
     }
     
     SDL_RenderPresent(renderer);
